@@ -5,6 +5,7 @@
 #include "delay.h"
 #include <vector>
 
+
 void DS18B20::capturaBit(int posicao, char v[], int valor)
 {
 	unsigned char pbyte = posicao / 8;
@@ -27,7 +28,7 @@ void DS18B20::fazScanProfessor(void)
 	for (int x = 0; x < 64; x++)
 	{
 		normal = onewire->readBit();
-		delay_us(500);
+
 		complemento = onewire->readBit();
 		if (normal == 0 && complemento == 0)
 		{
@@ -66,81 +67,79 @@ void DS18B20::fazScanProfessor(void)
 
 void DS18B20::fazScanNosso(void)
 {
-	char searchDirection;
-	char lastZero = 0;
-	char lastDiscrepancy = 0;
-	bool lastDeviceFlag = false;
-	std::vector<std::vector<char>> addresses;
+    char searchDirection = 0;
+    char lastZero = 0;
+    char lastDiscrepancy = 0;
+    bool doneFlag = false;
+    std::vector<std::vector<char>> addresses;
 
-	while (!lastDeviceFlag)
-	{
-		char v[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-		uint8_t normal, complemento;
+    while (!doneFlag)
+    {
+        char v[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        uint8_t normal, complemento;
 
-		onewire->reset();
-		onewire->writeByte(SEARCH_ROM);
-
-		for (int x = 0; x < 64; x++)
+		// checa se há dispositivos 1-Wire. Reset() retorna 0 se o(s) dispositivo(s) responderam, 1 se nenhum dispositivo respondeu
+		if (onewire->reset())
 		{
-			normal = onewire->readBit();
-			delay_us(70);
-			complemento = onewire->readBit();
-
-			if (normal == 0 && complemento == 0)
-			{
-				// bits conflitantes na posicao
-				if (x < lastDiscrepancy)
-					searchDirection = ((v[x / 8] >> (x % 8)) & 1);
-				else if (x == lastDiscrepancy)
-					searchDirection = 1;
-				else
-					searchDirection = 0;
-
-				if (searchDirection == 0)
-					lastZero = x;
-			}
-			else if (normal == 0 && complemento == 1)
-			{
-				// o bit é 0
-				searchDirection = 0;
-			}
-			else if (normal == 1 && complemento == 0)
-			{
-				// o bit é 1
-				searchDirection = 1;
-			}
-			else
-			{
-				// nao existem escravos no barramento
-				printf("Nao existem escravos no barramento\n");
-				return;
-			}
-
-			capturaBit(x, v, searchDirection);
-			onewire->escreve_bit(searchDirection);
+			printf("Nao existem escravos no barramento\n");
+			return;
 		}
 
-		lastDiscrepancy = lastZero;
+        //onewire->reset();
+        onewire->writeByte(SEARCH_ROM);
 
-		if (lastDiscrepancy == 0)
-			lastDeviceFlag = true;
+        int newLastDiscrepancy = 0;
 
-		addresses.push_back(std::vector<char>(v, v + sizeof(v) / sizeof(char)));
-	}
+        for (int x = 0; x < 64; x++)
+        {
+            normal = onewire->readBit();
+            complemento = onewire->readBit();
 
-	for (auto &addr : addresses)
-	{
-		int i = 1;
-		printf("Endereco sensor #%d completo: ", i);
-		for (auto it = addr.rbegin(); it != addr.rend(); ++it)
-		{
-			printf("%d ", *it);
-		}
-		printf("\n");
-		i++;
-	}
+            if (normal == 0 && complemento == 0)
+            {
+                if (x < lastDiscrepancy)
+                    searchDirection = ((v[x / 8] >> (x % 8)) & 1);
+                else if (x == lastDiscrepancy)
+                    searchDirection = 1;
+                else
+                    searchDirection = 0;
+
+                if (searchDirection == 0)
+                    newLastDiscrepancy = x;
+            }
+            else if (normal == 0 && complemento == 1)
+            {
+                searchDirection = 0;
+            }
+            else if (normal == 1 && complemento == 0)
+            {
+                searchDirection = 1;
+            }
+
+            capturaBit(x, v, searchDirection);
+            onewire->escreve_bit(searchDirection);
+        }
+
+        lastDiscrepancy = newLastDiscrepancy;
+
+        if (lastDiscrepancy == 0)
+            doneFlag = true;
+
+        addresses.push_back(std::vector<char>(v, v + sizeof(v) / sizeof(char)));
+    }
+
+    int i = 1;
+    for (auto &addr : addresses)
+    {
+        printf("Endereco sensor #%d completo: ", i);
+        for (auto it = addr.rbegin(); it != addr.rend(); ++it)
+        {
+            printf("%d ", *it);
+        }
+        printf("\n");
+        i++;
+    }
 }
-
 
 void DS18B20::init(char v[])
 {

@@ -41,10 +41,13 @@ void app_main()
 
   // meuSensor.init(v);
 
+  printf("fazScanProfessor:\n");
   meuSensor.fazScanProfessor();
-  delay_ms(1000);
-  printf("\n\n\n\n");
+  printf("\n\n");
+  printf("fazScanNosso:\n");
   meuSensor.fazScanNosso();
+
+
 
   /*   while(1){
 
