@@ -67,10 +67,16 @@ void DS18B20::fazScanProfessor(void)
 
 void DS18B20::fazScanNosso(void)
 {
+	//variavel usada para armazenar a direção de busca
     char searchDirection = 0;
-    char lastZero = 0;
+
+	//variavel usada para rastrear a última discrepância na sequência de bits lida dos sensores
     char lastDiscrepancy = 0;
+
+	//variavel usada para indicar quando a busca foi concluíd
     bool doneFlag = false;
+
+	//vetor de vetores de caracteres que armazenará os endereços dos sensores encontrados.
     std::vector<std::vector<char>> addresses;
 
     while (!doneFlag)
@@ -78,16 +84,21 @@ void DS18B20::fazScanNosso(void)
         char v[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         uint8_t normal, complemento;
 
-		// checa se há dispositivos 1-Wire. Reset() retorna 0 se o(s) dispositivo(s) responderam, 1 se nenhum dispositivo respondeu
+		/*
+		checa se há dispositivos 1-Wire. 
+		a função onewire->reset() retorna:
+			- 0 se algum dispositivo respondeu, 
+			- 1 se nenhum dispositivo respondeu
+		*/ 
 		if (onewire->reset())
 		{
 			printf("Nao existem escravos no barramento\n");
 			return;
 		}
 
-        //onewire->reset();
         onewire->writeByte(SEARCH_ROM);
 
+		// variavel usada para rastrear a nova discrepância na sequência de bits lida dos sensores.
         int newLastDiscrepancy = 0;
 
         for (int x = 0; x < 64; x++)
@@ -96,9 +107,20 @@ void DS18B20::fazScanNosso(void)
             complemento = onewire->readBit();
 
             if (normal == 0 && complemento == 0)
-            {
+	        {
+				// há uma discrepância entre os dispositivos.
+				
                 if (x < lastDiscrepancy)
+
+					// Abaixo é extraido o bit específico do vetor 'v' para determinar a direção de busca.
+					// Os passos são: 
+					// 1. O byte que contém o bit é selecionado usando 'x / 8'
+					// 2. O índice do bit dentro do byte é calculado com 'x % 8'
+					// 3. O deslocamento do byte à direita por esse índice coloca o bit desejado na posição menos significativa
+					// 4. Usando uma operação AND com 1, todos os outros bits são zerados, isolando o bit de interesse
+					// 5. O resultado é atribuído à variável 'searchDirection'	
                     searchDirection = ((v[x / 8] >> (x % 8)) & 1);
+					
                 else if (x == lastDiscrepancy)
                     searchDirection = 1;
                 else
@@ -128,16 +150,16 @@ void DS18B20::fazScanNosso(void)
         addresses.push_back(std::vector<char>(v, v + sizeof(v) / sizeof(char)));
     }
 
-    int i = 1;
+    int numsensores = 1;
     for (auto &addr : addresses)
     {
-        printf("Endereco sensor #%d completo: ", i);
+        printf("Endereco sensor #%d completo: ", numsensores);
         for (auto it = addr.rbegin(); it != addr.rend(); ++it)
         {
             printf("%d ", *it);
         }
         printf("\n");
-        i++;
+        numsensores++;
     }
 }
 
